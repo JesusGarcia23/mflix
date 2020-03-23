@@ -194,6 +194,9 @@ export default class MoviesDAO {
     const queryPipeline = [
       matchStage,
       sortStage,
+      skipStage,
+      limitStage,
+      facetStage
       // TODO Ticket: Faceted Search
       // Add the stages to queryPipeline in the correct order.
     ]
@@ -243,6 +246,8 @@ export default class MoviesDAO {
         .find(query)
         .project(project)
         .sort(sort)
+        .skip(page*20)
+        .limit(moviesPerPage)
     } catch (e) {
       console.error(`Unable to issue find command, ${e}`)
       return { moviesList: [], totalNumMovies: 0 }
@@ -297,8 +302,23 @@ export default class MoviesDAO {
         {
           $match: {
             _id: ObjectId(id)
+          },
+        },
+          {
+          $lookup: {
+            from: "comments",
+            let: { 'id': "$_id"},
+            pipeline: [
+              { $match:
+              { $expr: { $eq: ['$movie_id','$$id'] } },
+              },
+              {
+                $sort: {date: -1}
+              }
+            ],
+            as: 'comments'
           }
-        }
+        },
       ]
       return await movies.aggregate(pipeline).next()
     } catch (e) {
